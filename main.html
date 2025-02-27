@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced JSON Visualizer</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --color-primary: #e94560;
+            --color-secondary: #0f3460;
+            --text-primary: #f0f0f0;
+            --text-secondary: #b0b0b0;
+            --border-color: #2a2a4a;
+            --hover-color: #e94560;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Roboto Mono', monospace;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .title {
+            font-size: 24px;
+            color: var(--color-primary);
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        .left-panel {
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .right-panel {
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .input-area {
+            flex: 1;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            color: var(--text-secondary);
+        }
+
+        #jsonInput {
+            flex: 1;
+            width: 100%;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            border: none;
+            outline: none;
+            resize: none;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .visualizer {
+            flex: 1;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            overflow: auto;
+            margin-bottom: 10px;
+        }
+
+        .path-display {
+            height: 80px;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            overflow: auto;
+        }
+
+        #jsonTree {
+            font-size: 14px;
+            padding: 5px;
+        }
+
+        #pythonPath {
+            font-size: 14px;
+            color: var(--text-primary);
+            white-space: pre-wrap;
+            margin-bottom: 5px;
+        }
+
+        #copyButton {
+            padding: 5px 10px;
+            background-color: var(--color-secondary);
+            color: var(--text-primary);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            align-self: flex-end;
+        }
+
+        #copyButton:hover {
+            background-color: var(--color-primary);
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: var(--color-secondary);
+            color: var(--text-primary);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background-color: var(--color-primary);
+        }
+
+        .node {
+            margin-left: 20px;
+            position: relative;
+        }
+
+        .key {
+            color: #36d7b7;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .key:hover {
+            color: var(--hover-color);
+        }
+
+        .value-number {
+            color: #ff9e64;
+        }
+
+        .value-string {
+            color: #9ece6a;
+        }
+
+        .value-boolean {
+            color: #7dcfff;
+        }
+
+        .value-null {
+            color: #bb9af7;
+        }
+
+        .collapsible:before {
+            content: "▼";
+            display: inline-block;
+            margin-right: 6px;
+            font-size: 10px;
+            transition: transform 0.2s;
+        }
+
+        .collapsed:before {
+            transform: rotate(-90deg);
+        }
+
+        .collapsed + .children {
+            display: none;
+        }
+
+        .metrics {
+            margin-bottom: 15px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 20px;
+        }
+
+        .loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(26, 26, 46, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            display: none;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid var(--color-secondary);
+            border-top: 5px solid var(--color-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            color: #e94560;
+            margin-top: 5px;
+        }
+
+        .search-container {
+            display: flex;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+
+        #searchInput {
+            flex: 1;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .found {
+            background-color: rgba(233, 69, 96, 0.3);
+            border-radius: 2px;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .expand-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .level-controls {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .level-btn {
+            padding: 5px 10px;
+            min-width: 36px;
+            text-align: center;
+        }
+
+        .level-label {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 class="title">JSON Visualizer & Python Path Generator</h1>
+    </div>
+
+    <div class="container">
+        <div class="left-panel">
+            <div class="input-area">
+                <div class="panel-header">
+                    <div class="panel-title">JSON Input</div>
+                    <button id="visualizeBtn">Visualize</button>
+                </div>
+                <textarea id="jsonInput" placeholder="Paste your JSON here..."></textarea>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div class="toolbar">
+                <div class="expand-controls">
+                    <button id="collapseAllBtn">Collapse All</button>
+                    <div class="level-controls">
+                        <span class="level-label">Expand to level:</span>
+                        <button id="level1Btn" class="level-btn">1</button>
+                        <button id="level2Btn" class="level-btn">2</button>
+                        <button id="level3Btn" class="level-btn">3</button>
+                        <button id="levelCustomBtn" class="level-btn">...</button>
+                    </div>
+                </div>
+                <button id="formatBtn">Format JSON</button>
+                <div class="search-container">
+                    <input type="text" id="searchInput" placeholder="Search keys...">
+                    <button id="searchBtn">Search</button>
+                </div>
+            </div>
+
+            <div class="metrics">
+                <div id="sizeMetric">Size: 0 KB</div>
+                <div id="nodesMetric">Nodes: 0</div>
+                <div id="depthMetric">Max Depth: 0</div>
+            </div>
+
+            <div class="visualizer">
+                <div id="jsonTree"></div>
+            </div>
+
+            <div class="path-display">
+                <pre id="pythonPath">Click on any key to generate Python access path</pre>
+                <button id="copyButton">Copy</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const jsonInput = document.getElementById('jsonInput');
+            const jsonTree = document.getElementById('jsonTree');
+            const pythonPath = document.getElementById('pythonPath');
+            const visualizeBtn = document.getElementById('visualizeBtn');
+            const copyButton = document.getElementById('copyButton');
+            const collapseAllBtn = document.getElementById('collapseAllBtn');
+            const level1Btn = document.getElementById('level1Btn');
+            const level2Btn = document.getElementById('level2Btn');
+            const level3Btn = document.getElementById('level3Btn');
+            const levelCustomBtn = document.getElementById('levelCustomBtn');
+            const formatBtn = document.getElementById('formatBtn');
+            const searchInput = document.getElementById('searchInput');
+            const searchBtn = document.getElementById('searchBtn');
+            const sizeMetric = document.getElementById('sizeMetric');
+            const nodesMetric = document.getElementById('nodesMetric');
+            const depthMetric = document.getElementById('depthMetric');
+            const loading = document.querySelector('.loading');
+
+            let parsedJson = null;
+            let nodeCount = 0;
+            let maxDepth = 0;
+            let currentDepth = 0;
+
+            // Sample JSON for testing
+            const sampleJson = {
+                "name": "Advanced JSON Visualizer",
+                "version": 1.0,
+                "features": ["collapsible", "path generation", "large file support"],
+                "performance": {
+                    "maxSize": "10MB",
+                    "renderTime": "fast",
+                    "settings": {
+                        "lazyLoading": true,
+                        "virtualDOM": true,
+                        "deepSettings": {
+                            "level4": {
+                                "enabled": true,
+                                "options": ["a", "b", "c"]
+                            }
+                        }
+                    }
+                },
+                "nullValue": null,
+                "boolValue": true
+            };
+
+            jsonInput.value = JSON.stringify(sampleJson, null, 2);
+
+            // Function to visualize JSON
+            visualizeBtn.addEventListener('click', function() {
+                visualizeJson();
+            });
+
+            // Format JSON button
+            formatBtn.addEventListener('click', function() {
+                try {
+                    const json = JSON.parse(jsonInput.value);
+                    jsonInput.value = JSON.stringify(json, null, 2);
+                } catch (e) {
+                    showError("Invalid JSON: " + e.message);
+                }
+            });
+
+            // Function to visualize JSON
+            function visualizeJson() {
+                const jsonStr = jsonInput.value.trim();
+                if (!jsonStr) {
+                    showError("Please enter JSON data");
+                    return;
+                }
+
+                // Show loading spinner for large JSON files
+                loading.style.display = 'flex';
+
+                // Use setTimeout to allow the UI to update before starting the heavy processing
+                setTimeout(() => {
+                    try {
+                        // Reset counters
+                        nodeCount = 0;
+                        maxDepth = 0;
+                        currentDepth = 0;
+
+                        parsedJson = JSON.parse(jsonStr);
+
+                        // Update size metric
+                        const sizeInKB = (jsonStr.length / 1024).toFixed(2);
+                        sizeMetric.textContent = `Size: ${sizeInKB} KB`;
+
+                        // Clear previous content
+                        jsonTree.innerHTML = '';
+
+                        // Create the tree
+                        renderJsonNode(parsedJson, jsonTree, [], 0);
+
+                        // Update metrics
+                        nodesMetric.textContent = `Nodes: ${nodeCount}`;
+                        depthMetric.textContent = `Max Depth: ${maxDepth}`;
+
+                        // Clear previous errors
+                        const errorElem = document.querySelector('.error');
+                        if (errorElem) {
+                            errorElem.remove();
+                        }
+                    } catch (e) {
+                        showError("Invalid JSON: " + e.message);
+                    } finally {
+                        // Hide loading spinner
+                        loading.style.display = 'none';
+                    }
+                }, 10);
+            }
+
+            // Function to render a JSON node
+            function renderJsonNode(node, parentElement, path, level) {
+                currentDepth = level + 1;
+                maxDepth = Math.max(maxDepth, currentDepth);
+
+                if (Array.isArray(node)) {
+                    renderArray(node, parentElement, path, level);
+                } else if (node !== null && typeof node === 'object') {
+                    renderObject(node, parentElement, path, level);
+                } else {
+                    renderPrimitive(node, parentElement, path);
+                }
+            }
+
+            // Render an array
+            function renderArray(arr, parentElement, path, level) {
+                nodeCount++;
+
+                const arrayContainer = document.createElement('div');
+
+                const arrayHeader = document.createElement('span');
+                arrayHeader.className = 'key collapsible';
+                arrayHeader.dataset.level = level;
+
+                // Default to collapsed for levels deeper than 1
+                if (level > 0) {
+                    arrayHeader.classList.add('collapsed');
+                }
+
+                arrayHeader.textContent = 'Array';
+
+                if (path.length > 0) {
+                    const lastKey = path[path.length - 1];
+                    arrayHeader.textContent = lastKey;
+                }
+
+                arrayHeader.textContent += ` [${arr.length}]`;
+                arrayHeader.addEventListener('click', function() {
+                    this.classList.toggle('collapsed');
+                    generatePythonPath(path);
+                });
+
+                arrayContainer.appendChild(arrayHeader);
+
+                const childrenContainer = document.createElement('div');
+                childrenContainer.className = 'children';
+
+                // Process array elements in chunks to avoid blocking the UI
+                const renderChunk = (start, chunkSize) => {
+                    const end = Math.min(start + chunkSize, arr.length);
+
+                    for (let i = start; i < end; i++) {
+                        const itemContainer = document.createElement('div');
+                        itemContainer.className = 'node';
+
+                        // For arrays, we use the index as the path component
+                        const itemPath = [...path, i];
+                        renderJsonNode(arr[i], itemContainer, itemPath, level + 1);
+
+                        childrenContainer.appendChild(itemContainer);
+                    }
+
+                    // If there are more items to render, schedule the next chunk
+                    if (end < arr.length) {
+                        setTimeout(() => {
+                            renderChunk(end, chunkSize);
+                        }, 0);
+                    }
+                };
+
+                // Start rendering the first chunk
+                // Adjust chunk size based on array length
+                const chunkSize = arr.length > 1000 ? 100 : 500;
+                renderChunk(0, chunkSize);
+
+                arrayContainer.appendChild(childrenContainer);
+                parentElement.appendChild(arrayContainer);
+            }
+
+            // Render an object
+            function renderObject(obj, parentElement, path, level) {
+                nodeCount++;
+
+                const objContainer = document.createElement('div');
+
+                const objHeader = document.createElement('span');
+                objHeader.className = 'key collapsible';
+                objHeader.dataset.level = level;
+
+                // Default to collapsed for levels deeper than 1
+                if (level > 0) {
+                    objHeader.classList.add('collapsed');
+                }
+
+                if (path.length > 0) {
+                    const lastKey = path[path.length - 1];
+                    objHeader.textContent = lastKey;
+                } else {
+                    objHeader.textContent = 'Object';
+                }
+
+                // Count object properties
+                const propCount = Object.keys(obj).length;
+                objHeader.textContent += ` {${propCount}}`;
+
+                objHeader.addEventListener('click', function() {
+                    this.classList.toggle('collapsed');
+                    generatePythonPath(path);
+                });
+
+                objContainer.appendChild(objHeader);
+
+                const childrenContainer = document.createElement('div');
+                childrenContainer.className = 'children';
+
+                // Get all keys
+                const keys = Object.keys(obj);
+
+                // Process object properties in chunks to avoid blocking the UI
+                const renderChunk = (start, chunkSize) => {
+                    const end = Math.min(start + chunkSize, keys.length);
+
+                    for (let i = start; i < end; i++) {
+                        const key = keys[i];
+                        const propContainer = document.createElement('div');
+                        propContainer.className = 'node';
+
+                        const propPath = [...path, key];
+                        renderJsonNode(obj[key], propContainer, propPath, level + 1);
+
+                        childrenContainer.appendChild(propContainer);
+                    }
+
+                    // If there are more properties to render, schedule the next chunk
+                    if (end < keys.length) {
+                        setTimeout(() => {
+                            renderChunk(end, chunkSize);
+                        }, 0);
+                    }
+                };
+
+                // Start rendering the first chunk
+                // Adjust chunk size based on object size
+                const chunkSize = keys.length > 1000 ? 100 : 500;
+                renderChunk(0, chunkSize);
+
+                objContainer.appendChild(childrenContainer);
+                parentElement.appendChild(objContainer);
+            }
+
+            // Render a primitive value (string, number, boolean, null)
+            function renderPrimitive(value, parentElement, path) {
+                nodeCount++;
+
+                const container = document.createElement('div');
+
+                if (path.length > 0) {
+                    const key = document.createElement('span');
+                    key.className = 'key';
+                    key.textContent = path[path.length - 1] + ': ';
+                    key.addEventListener('click', function() {
+                        generatePythonPath(path);
+                    });
+                    container.appendChild(key);
+                }
+
+                const valueSpan = document.createElement('span');
+
+                if (value === null) {
+                    valueSpan.className = 'value-null';
+                    valueSpan.textContent = 'null';
+                } else if (typeof value === 'boolean') {
+                    valueSpan.className = 'value-boolean';
+                    valueSpan.textContent = value.toString();
+                } else if (typeof value === 'number') {
+                    valueSpan.className = 'value-number';
+                    valueSpan.textContent = value.toString();
+                } else if (typeof value === 'string') {
+                    valueSpan.className = 'value-string';
+                    valueSpan.textContent = `"${value}"`;
+                } else {
+                    valueSpan.textContent = value.toString();
+                }
+
+                container.appendChild(valueSpan);
+                parentElement.appendChild(container);
+            }
+
+            // Generate Python path for accessing the selected node
+            function generatePythonPath(path) {
+                let pythonCode = '';
+
+                if (path.length === 0) {
+                    pythonCode = 'data  # Root object';
+                } else {
+                    pythonCode = 'data';
+
+                    path.forEach(segment => {
+                        if (typeof segment === 'number') {
+                            // Array index
+                            pythonCode += `[${segment}]`;
+                        } else {
+                            // Object key
+                            pythonCode += `["${segment}"]`;
+                        }
+                    });
+                }
+
+                // Add some context to show how to use it
+                pythonCode = `# Python code to access this node:\n${pythonCode}`;
+
+                // Add example usage
+                pythonCode += '\n\n# Example usage:\n';
+                pythonCode += `value = ${pythonCode.split('\n')[1]}`;
+
+                pythonPath.textContent = pythonCode;
+            }
+
+            // Copy button functionality
+            copyButton.addEventListener('click', function() {
+                navigator.clipboard.writeText(pythonPath.textContent)
+                    .then(() => {
+                        const originalText = this.textContent;
+                        this.textContent = 'Copied!';
+                        setTimeout(() => {
+                            this.textContent = originalText;
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy: ', err);
+                    });
+            });
+
+            // Level-based expansion
+            function expandToLevel(targetLevel) {
+                // First collapse all
+                const allCollapsibles = document.querySelectorAll('.collapsible');
+                allCollapsibles.forEach(node => {
+                    node.classList.add('collapsed');
+                });
+
+                // Then expand up to the target level
+                for (let i = 0; i <= targetLevel; i++) {
+                    const levelNodes = document.querySelectorAll(`.collapsible[data-level="${i}"]`);
+                    levelNodes.forEach(node => {
+                        node.classList.remove('collapsed');
+                    });
+                }
+            }
+
+            // Level buttons event listeners
+            level1Btn.addEventListener('click', function() {
+                expandToLevel(0);
+            });
+
+            level2Btn.addEventListener('click', function() {
+                expandToLevel(1);
+            });
+
+            level3Btn.addEventListener('click', function() {
+                expandToLevel(2);
+            });
+
+            levelCustomBtn.addEventListener('click', function() {
+                const level = prompt("Enter level to expand to (0-10):", "4");
+                if (level !== null && !isNaN(parseInt(level))) {
+                    const levelNum = parseInt(level);
+                    if (levelNum >= 0 && levelNum <= 10) {
+                        expandToLevel(levelNum - 1);
+                    } else {
+                        alert("Please enter a number between 0 and 10");
+                    }
+                }
+            });
+
+            // Collapse all nodes
+            collapseAllBtn.addEventListener('click', function() {
+                const collapsibles = document.querySelectorAll('.collapsible');
+                collapsibles.forEach(node => {
+                    node.classList.add('collapsed');
+                });
+            });
+
+            // Search functionality
+            searchBtn.addEventListener('click', function() {
+                performSearch();
+            });
+
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    performSearch();
+                }
+            });
+
+            function performSearch() {
+                const searchTerm = searchInput.value.trim().toLowerCase();
+                if (!searchTerm) return;
+
+                // Remove previous highlights
+                const previousFound = document.querySelectorAll('.found');
+                previousFound.forEach(el => el.classList.remove('found'));
+
+                // Search for keys
+                const keys = document.querySelectorAll('.key');
+                let firstFound = null;
+
+                keys.forEach(key => {
+                    const keyText = key.textContent.toLowerCase();
+                    if (keyText.includes(searchTerm)) {
+                        key.classList.add('found');
+
+                        // Expand parent nodes to make the found node visible
+                        let parent = key.parentElement;
+                        while (parent) {
+                            const collapsible = parent.querySelector('.collapsible');
+                            if (collapsible) {
+                                collapsible.classList.remove('collapsed');
+                            }
+                            parent = parent.parentElement;
+                        }
+
+                        if (!firstFound) {
+                            firstFound = key;
+                        }
+                    }
+                });
+
+                // Scroll to the first found element
+                if (firstFound) {
+                    firstFound.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+
+            function showError(message) {
+                // Remove any existing error
+                const existingError = document.querySelector('.error');
+                if (existingError) {
+                    existingError.remove();
+                }
+
+                const errorElem = document.createElement('div');
+                errorElem.className = 'error';
+                errorElem.textContent = message;
+
+                jsonTree.innerHTML = '';
+                jsonTree.appendChild(errorElem);
+
+                // Reset metrics
+                sizeMetric.textContent = 'Size: 0 KB';
+                nodesMetric.textContent = 'Nodes: 0';
+                depthMetric.textContent = 'Max Depth: 0';
+
+                // Hide loading spinner
+                loading.style.display = 'none';
+            }
+
+            // Web Worker for handling large JSON (for even better performance)
+            if (window.Worker) {
+                const workerCode = `
+                    self.onmessage = function(e) {
+                        try {
+                            const result = JSON.parse(e.data);
+                            self.postMessage({success: true, result});
+                        } catch (error) {
+                            self.postMessage({success: false, error: error.message});
+                        }
+                    };
+                `;
+
+                // Create a blob from the worker code
+                const blob = new Blob([workerCode], {type: 'application/javascript'});
+                const workerUrl = URL.createObjectURL(blob);
+                const worker = new Worker(workerUrl);
+
+                worker.onmessage = function(e) {
+                    if (e.data.success) {
+                        // The JSON was parsed successfully
+                        parsedJson = e.data.result;
+                        // Continue with rendering
+                    } else {
+                        // There was an error parsing the JSON
+                        showError("Invalid JSON: " + e.data.error);
+                    }
+                };
+
+                // Function to use the worker for parsing very large JSON
+                function parseWithWorker(jsonStr) {
+                    worker.postMessage(jsonStr);
+                }
+            }
+
+            // Visualize the sample JSON on load
+            visualizeJson();
+
+            // Detect and handle paste events for better UX
+            jsonInput.addEventListener('paste', function() {
+                // Give a short delay to allow the paste to complete
+                setTimeout(() => {
+                    if (jsonInput.value.length > 1000000) { // 1MB threshold
+                        showError("Large JSON detected. Click 'Visualize' when ready.");
+                    }
+                }, 100);
+            });
+
+            // Handle drag and drop
+            jsonInput.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.style.background = 'rgba(22, 33, 62, 0.8)';
+            });
+
+            jsonInput.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.style.background = 'var(--bg-secondary)';
+            });
+
+            jsonInput.addEventListener('drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.style.background = 'var(--bg-secondary)';
+
+                const file = e.dataTransfer.files[0];
+                if (file) {
+                    if (file.type === 'application/json' || file.name.endsWith('.json')) {
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            jsonInput.value = event.target.result;
+                            if (jsonInput.value.length > 1000000) { // 1MB threshold
+                                showError("Large JSON file loaded. Click 'Visualize' when ready.");
+                            } else {
+                                visualizeJson();
+                            }
+                        };
+                        reader.readAsText(file);
+                    } else {
+                        showError("Please drop a JSON file");
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
